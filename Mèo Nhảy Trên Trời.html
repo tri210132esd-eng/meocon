@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mèo Nhảy Trên Trời</title>
+<style>
+:root{--bg:#eaf6ff;--sky1:#7cc8ff;--sky2:#e6f6ff;--text:#1d3350;--cloud:#ffffff;--move:#ffd9a0;--frag:#d9c7ff;--spring:#ff6b6b;--accent:#ff8a3d;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1424;--sky1:#141c3d;--sky2:#3a3f7a;--text:#f1ecff;--cloud:#cfd6f5;--move:#e8c48a;--frag:#a99be0;--accent:#ff9d5c}}
+:root[data-theme="dark"]{--bg:#0f1424;--sky1:#141c3d;--sky2:#3a3f7a;--text:#f1ecff;--cloud:#cfd6f5;--move:#e8c48a;--frag:#a99be0;--accent:#ff9d5c}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;flex-direction:column;align-items:center;padding:12px;min-height:100vh}
+h1{margin:4px 0;font-size:1.5rem}
+p{margin:0 0 10px;opacity:.8;text-align:center;font-size:.95rem}
+canvas{width:100%;max-width:380px;height:auto;border-radius:18px;display:block;touch-action:none;border:3px solid var(--accent)}
+</style>
+</head>
+<body>
+<h1>🐱 Mèo Nhảy Trên Trời ☁️</h1>
+<p>← → hoặc A / D để di chuyển. Trên điện thoại: chạm nửa trái / phải màn hình.</p>
+<canvas id="c" width="360" height="560"></canvas>
+<script>
+const cv=document.getElementById('c'),ctx=cv.getContext('2d'),W=360,H=560,PW=72;
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let cat,plats,score,best=0,over,started=false,dir=0,keys={},stars=[];
+try{best=+localStorage.getItem('meo_sky_best')||0}catch(e){}
+for(let i=0;i<40;i++)stars.push({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.5+.5});
+function mk(y){
+const d=Math.min(score/3000,1),r=Math.random();
+let type=0;
+if(r<.12+d*.12)type=1;else if(r<.22+d*.2)type=2;else if(r<.3+d*.2)type=3;
+return{x:Math.random()*(W-PW),y,type,dx:(Math.random()<.5?-1:1)*(1+d*1.5),dead:false}}
+function reset(){
+score=0;over=false;
+cat={x:W/2,y:H-100,vy:-11};
+plats=[{x:W/2-PW/2,y:H-60,type:0,dx:0}];
+let y=H-60;
+while(y>-60){y-=70;plats.push(mk(y))}}
+function highest(){return Math.min(...plats.map(p=>p.y))}
+function update(){
+if(!started||over)return;
+dir=(keys.ArrowLeft||keys.a?-1:0)+(keys.ArrowRight||keys.d?1:0)||dir_touch;
+cat.x+=dir*5;
+if(cat.x<-15)cat.x=W+15;if(cat.x>W+15)cat.x=-15;
+const prev=cat.y+18;
+cat.vy+=.4;cat.y+=cat.vy;
+const feet=cat.y+18;
+if(cat.vy>0){
+for(const p of plats){
+if(p.dead)continue;
+if(cat.x+14>p.x&&cat.x-14<p.x+PW&&prev<=p.y+3&&feet>=p.y){
+cat.vy=p.type===3?-17:-11.5;
+if(p.type===2)p.dead=true;
+break}}}
+plats.forEach(p=>{if(p.type===1){p.x+=p.dx;if(p.x<0||p.x>W-PW)p.dx*=-1}});
+if(cat.y<H*.4){
+const d=H*.4-cat.y;cat.y=H*.4;score+=d;
+plats.forEach(p=>p.y+=d);
+stars.forEach(s=>{s.y+=d*.2;if(s.y>H){s.y=0;s.x=Math.random()*W}})}
+plats=plats.filter(p=>p.y<H+20);
+const gap=60+Math.min(score/60,50);
+while(highest()>-20)plats.push(mk(highest()-gap+Math.random()*10));
+if(cat.y>H+40){
+over=true;
+if(score>best){best=Math.floor(score);try{localStorage.setItem('meo_sky_best',best)}catch(e){}}}}
+let dir_touch=0;
+function pt(e){const r=cv.getBoundingClientRect();return(e.clientX-r.left)/r.width<.5?-1:1}
+cv.addEventListener('pointerdown',e=>{
+if(over||!started){started=true;if(over)reset();dir_touch=0;return}
+dir_touch=pt(e)});
+cv.addEventListener('pointermove',e=>{if(e.buttons||e.pointerType==='touch')if(dir_touch)dir_touch=pt(e)});
+['pointerup','pointercancel','pointerleave'].forEach(n=>cv.addEventListener(n,()=>dir_touch=0));
+document.addEventListener('keydown',e=>{
+if(['ArrowLeft','ArrowRight','a','d',' '].includes(e.key))e.preventDefault();
+keys[e.key]=true;
+if(!started||(over&&(e.key===' '||e.key==='Enter'))){started=true;if(over)reset()}});
+document.addEventListener('keyup',e=>keys[e.key]=false);
+function rr(x,y,w,h,r){ctx.beginPath();ctx.roundRect?ctx.roundRect(x,y,w,h,r):ctx.rect(x,y,w,h);ctx.fill()}
+function draw(){
+const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,css('--sky1'));g.addColorStop(1,css('--sky2'));
+ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+ctx.fillStyle='rgba(255,255,255,.55)';stars.forEach(s=>{ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,7);ctx.fill()});
+plats.forEach(p=>{
+if(p.dead)return;
+ctx.fillStyle=css(p.type===1?'--move':p.type===2?'--frag':'--cloud');
+rr(p.x,p.y,PW,16,8);rr(p.x+10,p.y-8,PW-30,14,7);
+if(p.type===3){ctx.font='20px serif';ctx.textAlign='center';ctx.fillText('🍀',p.x+PW/2,p.y-6)}});
+ctx.font='36px serif';ctx.textAlign='center';
+ctx.save();ctx.translate(cat.x,cat.y);
+if(dir<0)ctx.scale(-1,1);
+ctx.fillText('🐱',0,14);ctx.restore();
+ctx.fillStyle=css('--text');ctx.font='bold 18px system-ui,sans-serif';ctx.textAlign='left';
+ctx.fillText('Độ cao: '+Math.floor(score/10)+' m',12,26);
+ctx.textAlign='right';ctx.fillText('Kỷ lục: '+Math.floor(Math.max(best,score)/10)+' m',W-12,26);
+ctx.textAlign='center';ctx.font='bold 24px system-ui,sans-serif';
+if(!started){ctx.fillText('Bấm để bắt đầu!',W/2,H/2-60);ctx.font='15px system-ui,sans-serif';ctx.fillText('🟠 mây cam trượt · 🟣 mây tím vỡ · 🍀 nảy cao',W/2,H/2-30)}
+if(over){ctx.fillText('Mèo rơi mất rồi! 🙀',W/2,H/2-40);ctx.font='16px system-ui,sans-serif';ctx.fillText('Bấm / Space để chơi lại',W/2,H/2-12)}}
+function loop(){update();draw();requestAnimationFrame(loop)}
+reset();loop();
+</script>
+</body>
+</html>
